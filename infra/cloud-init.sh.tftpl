@@ -1,0 +1,79 @@
+#!/bin/bash
+set -euo pipefail
+# No shell tracing: the password must never appear in cloud-init output.
+dnf install -y docker python3
+systemctl enable --now docker
+mkdir -p /srv/valheim
+# Nitro exposes EBS as NVMe: match the volume serial, never assume nvme1n1.
+world_device=""
+for attempt in $(seq 1 120); do
+  world_device=$(lsblk -dnpo NAME,SERIAL | awk '$2 == "${volume_id}" {print $1}')
+  [ -n "$world_device" ] && break
+  sleep 5
+done
+[ -n "$world_device" ] || { echo "World EBS attachment missing" >&2; exit 1; }
+fs_type=$(lsblk -ndo FSTYPE "$world_device")
+if [ -z "$fs_type" ]; then
+  # Refuse to format any disk that has partitions or unrecognized signatures.
+  [ "$(lsblk -n "$world_device" | wc -l)" -eq 1 ]
+  [ -z "$(wipefs -n --noheadings -o TYPE "$world_device")" ]
+  mkfs.ext4 "$world_device"
+else
+  [ "$fs_type" = "ext4" ] || { echo "Unexpected world filesystem" >&2; exit 1; }
+fi
+world_uuid=$(blkid -s UUID -o value "$world_device")
+grep -q "UUID=$world_uuid " /etc/fstab || echo "UUID=$world_uuid /srv/valheim ext4 defaults 0 2" >> /etc/fstab
+mountpoint -q /srv/valheim || mount /srv/valheim
+mkdir -p /srv/valheim/config /srv/valheim/data
+cat > /etc/valheim.env <<'ENV'
+SERVER_NAME=${server_name}
+WORLD_NAME=${world_name}
+SERVER_PUBLIC=false
+SERVER_PASS_FILE=/run/secrets/server_pass
+CROSSPLAY=${crossplay}
+BACKUPS=true
+BACKUPS_MAX_AGE=7
+BACKUPS_MAX_COUNT=168
+RESTART_CRON=
+ENV
+chmod 600 /etc/valheim.env
+cat > /usr/local/sbin/valheim-password <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+umask 077
+mkdir -p /run/valheim
+aws ssm get-parameter --name '${password_parameter}' --with-decryption --region '${region}' --output json | python3 -c '
+import json, sys
+password = json.load(sys.stdin)["Parameter"]["Value"]
+if len(password) < 5 or "\n" in password or "\r" in password:
+    raise ValueError("Password must have at least five characters and no newlines")
+with open("/run/valheim/server_pass", "w") as f:
+    f.write(password)
+'
+SCRIPT
+chmod 700 /usr/local/sbin/valheim-password
+cat > /etc/systemd/system/valheim.service <<'UNIT'
+[Unit]
+Description=Valheim dedicated server
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+RequiresMountsFor=/srv/valheim
+StartLimitIntervalSec=0
+
+[Service]
+Restart=always
+RestartSec=15
+TimeoutStartSec=900
+TimeoutStopSec=150
+ExecStartPre=/usr/bin/mountpoint -q /srv/valheim
+ExecStartPre=/usr/local/sbin/valheim-password
+ExecStartPre=-/usr/bin/docker rm valheim
+ExecStart=/usr/bin/docker run --name valheim --stop-timeout 120 --cap-add SYS_NICE --log-opt max-size=10m --log-opt max-file=3 --env-file /etc/valheim.env -p 2456-2457:2456-2457/udp -v /srv/valheim/config:/config -v /srv/valheim/data:/opt/valheim -v /run/valheim:/run/secrets:ro ${container_image}
+ExecStop=/usr/bin/docker stop --time 120 valheim
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now valheim

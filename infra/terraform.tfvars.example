@@ -1,0 +1,17 @@
+region                 = "us-east-2"
+name                   = "valheim"
+discord_application_id = "REPLACE_ME"
+discord_public_key     = "REPLACE_ME"
+discord_guild_id       = "REPLACE_ME"
+allowed_role_ids       = ["REPLACE_WITH_VALHEIM_ROLE_ID"]
+server_name            = "Friends of Valheim"
+world_name             = "Midgard"
+password_parameter_name = "/valheim/server-password"
+# Default: 2 vCPU / 8 GiB, standard CPU credits (no surplus-credit charges).
+instance_type          = "t3a.large"
+# Set true for Xbox / Microsoft Store players.
+crossplay              = false
+# Optional: restrict UDP to your friends' public IPv4 CIDRs.
+allowed_game_cidrs     = ["0.0.0.0/0"]
+# For repeatable container releases, replace :latest with @sha256:<digest>.
+container_image = "ghcr.io/community-valheim-tools/valheim-server:latest"
