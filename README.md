@@ -14,7 +14,7 @@ Run one Valheim VM for your friends. Start it from Discord when you want to play
 | `/valheim start` | Starts the VM; allow several minutes for Valheim to load or update. |
 | `/valheim stop` | Requests normal OS shutdown so Valheim can save, then stops compute. Disconnects everyone. |
 | `/valheim pause` | Alias for stop. This is not hibernation or an in-game pause. |
-| `/valheim status` | Shows VM state, current IP address, and player count when available. Crossplay counts include when the game last reported them. |
+| `/valheim status` | Shows VM state, current IP address, and the crossplay join code when available. |
 
 Replies are visible only to the person invoking the command. Every command requires a configured role in the configured Discord server, including for administrators. The password is shared separately with players.
 
@@ -60,7 +60,7 @@ The default region is Ohio (`us-east-2`), a geographic starting point for a US g
 4. Enable Discord Developer Mode. Copy your server ID and the ID of a role such as **Valheim Players**. Assign the role to yourself and your friends.
 5. Later, after registration, open **Server Settings → Integrations → your application** and allow that role to use `/valheim`. The command starts disabled for ordinary members. Both Discord's command permissions and the handler's role allowlist must permit access.
 
-Player counts use a fixed, read-only SSM document on the running VM. Crossplay reads the latest game session count and shows its age; Steam mode queries the local game port. If the game is starting, SSM is unavailable, or the report is over 24 hours old, status says **unavailable**, not zero. A stopped VM reports zero. No additional public ports are opened.
+The crossplay join code is read from the running game's session logs through a fixed, read-only SSM document. It is checked on each status request because it can change after a restart. If the game is starting, crossplay is disabled, or its code cannot be read, status says **unavailable** and still shows the VM address. Only logs from the current game process are considered. No additional public ports are opened.
 
 Discord sends [signed HTTP interactions](https://docs.discord.com/developers/interactions/receiving-and-responding). The receiver checks the signature and a five-minute timestamp window, checks the application/server/roles, queues the work, and returns a private deferred response. The worker edits that response with the result. Discord requires the initial acknowledgement within three seconds; AWS cold starts or throttling can occasionally cause a timeout. Check status before repeating an uncertain lifecycle action.
 
@@ -115,7 +115,7 @@ unset DISCORD_BOT_TOKEN
 
 Press Enter after pasting the token into the silent prompt. Grant the role command access in Discord Integrations. Registration updates `/valheim` by name and preserves unrelated commands in the application.
 
-Join using the address returned by `/valheim status` and the password. The server is not listed publicly by default. Its public IP is released on stop and can change on start; use the latest address. Initial Steam installation takes several minutes. Crossplay players can retrieve the join code from the server logs if needed.
+Join using the address returned by `/valheim status` and the password. The server is not listed publicly by default. Its public IP is released on stop and can change on start; use the latest address. Initial Steam installation takes several minutes. Crossplay players can use the join code returned by `/valheim status`.
 
 ## Crossplay and portal items
 
