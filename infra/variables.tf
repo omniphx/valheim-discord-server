@@ -99,3 +99,9 @@ variable "container_image" {
     error_message = "Provide a container image reference, preferably pinned to a digest."
   }
 }
+
+variable "allow_portal_items" {
+  type        = bool
+  default     = false
+  description = "Apply the casual portal modifier so ore and other restricted items can pass through portals."
+}

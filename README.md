@@ -115,6 +115,12 @@ Press Enter after pasting the token into the silent prompt. Grant the role comma
 
 Join using the address returned by `/valheim status` and the password. The server is not listed publicly by default. Its public IP is released on stop and can change on start; use the latest address. Initial Steam installation takes several minutes. Crossplay players can retrieve the join code from the server logs if needed.
 
+## Crossplay and portal items
+
+Set `crossplay = true` in `terraform.tfvars` to enable the PlayFab crossplay backend. Supported PC and console clients must run compatible game versions. Crossplay players can use the public address or the join code in the game logs; local/loopback IPs are not supported by the crossplay backend.
+
+Set `allow_portal_items = true` to pass ore and other restricted items through portals. This adds only `-modifier portals casual`, preserving the other difficulty settings. The game persists world modifiers in the save: later setting the variable to false stops applying the flag but does not clear an already-saved modifier; reset it using Valheim's world-modifier UI if needed. See the [official dedicated-server guide](https://valheim.com/support/a-guide-to-dedicated-servers/).
+
 ## Cost and performance
 
 Stopping removes EC2 compute charges once the VM is **stopped**. It retains **both** disks: a 16 GiB root disk and a 30 GiB world disk. EBS, any snapshots you create, and controller/log usage can still incur charges. The automatic IPv4 address is released on stop, avoiding an idle Elastic IP charge. See [EC2 stop/start behavior](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Stop_Start.html).
@@ -163,7 +169,7 @@ aws ec2 create-snapshot --region us-east-2 --volume-id "$(terraform -chdir=infra
 
 Snapshots are billed separately; wait for completion before destructive maintenance. To restore a local archive, first `sudo systemctl stop valheim` on the running host, copy the current `.db` and `.fwl` files somewhere safe, inspect the ZIP paths, then restore the matching pair from the same backup to `config/worlds_local`. Preserve file ownership and use the matching `world_name`; restart with `sudo systemctl start valheim`. Do not extract over a live world. To recover a lost disk, create a volume from a snapshot **in the VM's Availability Zone**, reconcile/import it into Terraform's `aws_ebs_volume.world` resource, and update the attachment/bootstrap reference during a planned recovery. Do not initialize a blank disk over your only saved world.
 
-Container and game updates: the image defaults to `latest` for approachable setup, but Docker keeps its locally cached image until you pull a new one. Pin `container_image` to a published digest for repeatable container releases. The container independently updates Steam game binaries, so a digest does not freeze the game version. Back up before maintenance. Host packages/bootstrap are installed on first launch; changing Terraform user data requests VM replacement and is intentionally blocked by `prevent_destroy`. Routine password rotation needs only a service/VM restart. For other configuration updates, edit the host configuration through SSM and keep the corresponding template/variables in sync, or plan a protected rebuild.
+Container and game updates: the image defaults to `latest` for approachable setup, but Docker keeps its locally cached image until you pull a new one. Pin `container_image` to a published digest for repeatable container releases. The container independently updates Steam game binaries, so a digest does not freeze the game version. Back up before maintenance. Host packages/bootstrap are installed on first launch. Terraform ignores later bootstrap edits for existing VMs, so settings changes do not replace the server. For an existing server, update `/etc/valheim.env` through Session Manager and restart `valheim` with systemd; keep the corresponding Terraform variables in sync for future deployments. For example, use `CROSSPLAY=true` and `SERVER_ARGS=-modifier portals casual` for crossplay and ore transport. Routine password rotation needs only a service/VM restart.
 
 ## Validation and live acceptance
 

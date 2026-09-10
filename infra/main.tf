@@ -100,16 +100,18 @@ resource "aws_instance" "game" {
     encrypted   = true
   }
   user_data = templatefile("${path.module}/cloud-init.sh.tftpl", {
-    volume_id   = replace(aws_ebs_volume.world.id, "-", "")
-    region      = var.region, password_parameter = var.password_parameter_name
-    server_name = var.server_name, world_name = var.world_name
-    crossplay   = var.crossplay, container_image = var.container_image
+    volume_id          = replace(aws_ebs_volume.world.id, "-", "")
+    region             = var.region, password_parameter = var.password_parameter_name
+    server_name        = var.server_name, world_name = var.world_name
+    crossplay          = var.crossplay, container_image = var.container_image
+    allow_portal_items = var.allow_portal_items
   })
   tags       = { Name = var.name }
   depends_on = [aws_route_table_association.game, aws_iam_role_policy.password, aws_iam_role_policy_attachment.ssm]
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [ami]
+    # cloud-init runs only on first launch. Existing hosts load /etc/valheim.env.
+    ignore_changes = [ami, user_data]
   }
 }
 resource "aws_volume_attachment" "world" {
