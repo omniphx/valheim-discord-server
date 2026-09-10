@@ -38,8 +38,8 @@ def run(*args):
 def player_count():
     try:
         # Never return an old session count while the game process is stopped.
-        processes = run('docker', 'top', 'valheim', '-eo', 'comm')
-        if not any(line.strip().startswith('valheim_server') for line in processes.splitlines()[1:]):
+        processes = run('docker', 'top', 'valheim', '-eo', 'pid,comm')
+        if not any(line.split()[-1].startswith('valheim_server') for line in processes.splitlines()[1:]):
             return None
         crossplay = run('docker', 'exec', 'valheim', 'printenv', 'CROSSPLAY').strip().lower() == 'true'
         if crossplay:

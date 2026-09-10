@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 spec = importlib.util.spec_from_file_location('player_count', Path(__file__).resolve().parents[1] / 'scripts/player-count.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -24,3 +25,14 @@ class PlayerCountTest(unittest.TestCase):
         self.assertIsNone(module.crossplay_count(self.line(999)))
         self.assertIsNone(module.crossplay_count(self.line(1).replace('2026-09-10T02:50:39.097404693Z', 'invalid')))
         self.assertIsNone(module.crossplay_count('Chat: '+self.line(3)))
+
+    def test_docker_process_list_requires_pid_column(self):
+        def fake_run(*args):
+            if args[:2] == ('docker', 'top'):
+                self.assertEqual(args, ('docker', 'top', 'valheim', '-eo', 'pid,comm'))
+                return 'PID COMMAND\n42 valheim_server.\n'
+            if args[-1] == 'CROSSPLAY':
+                return 'false'
+            return '0'
+        with patch.object(module, 'run', side_effect=fake_run):
+            self.assertEqual(module.player_count()['players'], 0)
