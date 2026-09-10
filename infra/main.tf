@@ -140,11 +140,30 @@ resource "aws_iam_role_policy" "logs" {
   role     = each.value.id
   policy   = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "${aws_cloudwatch_log_group.lambda[each.key].arn}:*" }] })
 }
+resource "aws_ssm_document" "player_count" {
+  name            = "${var.name}-player-count"
+  document_type   = "Command"
+  document_format = "JSON"
+  content = jsonencode({
+    schemaVersion = "2.2"
+    description   = "Read Valheim player count; no caller-supplied commands or parameters."
+    mainSteps = [{
+      action = "aws:runShellScript"
+      name   = "playerCount"
+      inputs = {
+        timeoutSeconds = "20"
+        runCommand     = ["python3 - <<'VALHEIM_PLAYER_COUNT'\n${file("${path.module}/../scripts/player-count.py")}\nVALHEIM_PLAYER_COUNT"]
+      }
+    }]
+  })
+}
 resource "aws_iam_role_policy" "worker" {
   role = aws_iam_role.lambda["worker"].id
   policy = jsonencode({ Version = "2012-10-17", Statement = [
     { Effect = "Allow", Action = ["ec2:DescribeInstances"], Resource = "*" },
-    { Effect = "Allow", Action = ["ec2:StartInstances", "ec2:StopInstances"], Resource = aws_instance.game.arn }
+    { Effect = "Allow", Action = ["ec2:StartInstances", "ec2:StopInstances"], Resource = aws_instance.game.arn },
+    { Effect = "Allow", Action = ["ssm:SendCommand"], Resource = [aws_instance.game.arn, aws_ssm_document.player_count.arn] },
+    { Effect = "Allow", Action = ["ssm:GetCommandInvocation"], Resource = "*" }
   ] })
 }
 resource "aws_iam_role_policy" "receiver" {
@@ -160,7 +179,7 @@ resource "aws_lambda_function" "worker" {
   source_code_hash = data.archive_file.controller.output_base64sha256
   timeout          = 60
   memory_size      = 256
-  environment { variables = { INSTANCE_ID = aws_instance.game.id, DISCORD_APPLICATION_ID = var.discord_application_id } }
+  environment { variables = { INSTANCE_ID = aws_instance.game.id, DISCORD_APPLICATION_ID = var.discord_application_id, PLAYER_COUNT_DOCUMENT = aws_ssm_document.player_count.name } }
   depends_on = [aws_iam_role_policy.logs, aws_iam_role_policy.worker]
 }
 resource "aws_lambda_function_event_invoke_config" "worker" {

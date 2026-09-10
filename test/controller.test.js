@@ -48,9 +48,10 @@ test('queue failure returns an actionable response', async () => {
   assert.equal(JSON.parse(result.body).type, 4);
   assert.match(JSON.parse(result.body).data.content, /try again/);
 });
-async function runWorker(action, state, { failAws = false, replyStatuses = [200] } = {}) {
+async function runWorker(action, state, { failAws = false, replyStatuses = [200], count = null } = {}) {
   const calls = [], replies = [];
-  const worker = createWorker({ env, sleep: async () => {}, ec2: { send: async command => {
+  let countQueries = 0;
+  const worker = createWorker({ env, sleep: async () => {}, playerCount: async () => { countQueries++; return count; }, ec2: { send: async command => {
     calls.push(command);
     if (failAws) throw Object.assign(new Error('private details'), { name: 'AccessDenied' });
     return { Reservations: [{ Instances: [{ State: { Name: state }, PublicIpAddress: '203.0.113.7' }] }] };
@@ -60,7 +61,7 @@ async function runWorker(action, state, { failAws = false, replyStatuses = [200]
     return { ok: status === 200, status };
   } });
   await worker({ action, applicationId: '123', token: 'secret-token' });
-  return { calls, replies };
+  return { calls, replies, countQueries };
 }
 test('start changes only a stopped instance and is scoped to configured ID', async () => {
   const { calls, replies } = await runWorker('start', 'stopped');
@@ -100,4 +101,19 @@ test('invalid worker payload never calls AWS', async () => {
   const worker = createWorker({ env, ec2: { send: () => assert.fail() } });
   await assert.rejects(worker({ action: 'terminate', applicationId: '123', token: 'abc' }), /Invalid worker event/);
   await assert.rejects(worker({ action: 'start', applicationId: '456', token: 'abc' }), /Invalid worker event/);
+});
+
+test('crossplay status includes the last reported player count and age', async () => {
+  const { replies } = await runWorker('status', 'running', { count: { players: 3, source: 'crossplay', ageSeconds: 80 } });
+  assert.match(replies[0].content, /Players: \*\*3\*\* \(last reported 1m ago\)/);
+});
+test('unavailable count does not become zero or hide the VM address', async () => {
+  const { replies } = await runWorker('status', 'running');
+  assert.match(replies[0].content, /Players: \*\*unavailable/);
+  assert.match(replies[0].content, /203\.0\.113\.7:2456/);
+});
+test('stopped server reports zero players without querying the host', async () => {
+  const { replies, countQueries } = await runWorker('status', 'stopped');
+  assert.equal(countQueries, 0);
+  assert.match(replies[0].content, /Players: \*\*0\*\*/);
 });

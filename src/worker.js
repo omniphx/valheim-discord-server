@@ -1,7 +1,8 @@
 import { EC2Client, DescribeInstancesCommand, StartInstancesCommand, StopInstancesCommand } from '@aws-sdk/client-ec2';
+import { getPlayerCount } from './player-count.js';
 const client = new EC2Client({ maxAttempts: 2 });
 
-export function createWorker({ env = process.env, ec2 = client, fetcher = fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
+export function createWorker({ env = process.env, ec2 = client, fetcher = fetch, playerCount = getPlayerCount, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
   return async event => {
     // This function has no public endpoint; only the signature-verifying receiver can invoke it.
     if (!['start', 'stop', 'pause', 'status'].includes(event.action) || event.applicationId !== env.DISCORD_APPLICATION_ID || !/^[A-Za-z0-9._-]+$/.test(event.token ?? '')) throw new Error('Invalid worker event');
@@ -20,7 +21,14 @@ export function createWorker({ env = process.env, ec2 = client, fetcher = fetch,
       } else {
         content = `VM state: **${state}**.`;
         if (state === 'running') content += instance.PublicIpAddress ? `\nJoin: **${instance.PublicIpAddress}:2456**\nThis reports VM state, not game readiness. If joining fails, wait a few minutes or check server logs.` : '\nThe public address is not available yet.';
-        if (state === 'stopped') content += '\nCompute is off; world storage is retained. Use /valheim start to play.';
+        if (event.action === 'status' && state === 'running') {
+          const count = await playerCount().catch(() => null);
+          if (count) {
+            const age = count.ageSeconds < 60 ? 'under a minute ago' : count.ageSeconds < 3600 ? `${Math.floor(count.ageSeconds / 60)}m ago` : `${Math.floor(count.ageSeconds / 3600)}h ago`;
+            content += count.source === 'crossplay' ? `\nPlayers: **${count.players}** (last reported ${age}).` : `\nPlayers: **${count.players}**.`;
+          } else content += '\nPlayers: **unavailable** — the game may still be starting or its count could not be read.';
+        }
+        if (state === 'stopped') content += '\nPlayers: **0**.\nCompute is off; world storage is retained. Use /valheim start to play.';
         if (['pending', 'stopping'].includes(state)) content += '\nA transition is in progress. Check again shortly before sending another action.';
       }
     } catch (error) {

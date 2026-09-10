@@ -6,7 +6,7 @@ const command = {
   default_member_permissions: '0',
   options: [
     ['start', 'Start the Valheim VM'], ['stop', 'Save and stop the VM; disconnects all players'],
-    ['pause', 'Alias for stop; saves the world and disconnects all players'], ['status', 'Show VM state and current connection address']
+    ['pause', 'Alias for stop; saves the world and disconnects all players'], ['status', 'Show VM state, connection address, and player count']
   ].map(([name, description]) => ({ type: 1, name, description }))
 };
 // POST upserts this command by name, preserving other commands in the application.

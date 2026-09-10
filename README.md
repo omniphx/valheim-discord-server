@@ -14,7 +14,7 @@ Run one Valheim VM for your friends. Start it from Discord when you want to play
 | `/valheim start` | Starts the VM; allow several minutes for Valheim to load or update. |
 | `/valheim stop` | Requests normal OS shutdown so Valheim can save, then stops compute. Disconnects everyone. |
 | `/valheim pause` | Alias for stop. This is not hibernation or an in-game pause. |
-| `/valheim status` | Shows VM state and the current IP address. Does not claim game readiness. |
+| `/valheim status` | Shows VM state, current IP address, and player count when available. Crossplay counts include when the game last reported them. |
 
 Replies are visible only to the person invoking the command. Every command requires a configured role in the configured Discord server, including for administrators. The password is shared separately with players.
 
@@ -59,6 +59,8 @@ The default region is Ohio (`us-east-2`), a geographic starting point for a US g
 3. Configure a **Guild Install**, with the `bot` and `applications.commands` scopes. No administrator bot permission or privileged Gateway intents are needed. Use the portal's install link to add the application to your server.
 4. Enable Discord Developer Mode. Copy your server ID and the ID of a role such as **Valheim Players**. Assign the role to yourself and your friends.
 5. Later, after registration, open **Server Settings → Integrations → your application** and allow that role to use `/valheim`. The command starts disabled for ordinary members. Both Discord's command permissions and the handler's role allowlist must permit access.
+
+Player counts use a fixed, read-only SSM document on the running VM. Crossplay reads the latest game session count and shows its age; Steam mode queries the local game port. If the game is starting, SSM is unavailable, or the report is over 24 hours old, status says **unavailable**, not zero. A stopped VM reports zero. No additional public ports are opened.
 
 Discord sends [signed HTTP interactions](https://docs.discord.com/developers/interactions/receiving-and-responding). The receiver checks the signature and a five-minute timestamp window, checks the application/server/roles, queues the work, and returns a private deferred response. The worker edits that response with the result. Discord requires the initial acknowledgement within three seconds; AWS cold starts or throttling can occasionally cause a timeout. Check status before repeating an uncertain lifecycle action.
 
@@ -166,6 +168,8 @@ The upstream container makes hourly local backups, capped at seven days / 168 ar
 aws ec2 wait instance-stopped --region us-east-2 --instance-ids "$(terraform -chdir=infra output -raw instance_id)"
 aws ec2 create-snapshot --region us-east-2 --volume-id "$(terraform -chdir=infra output -raw world_volume_id)" --description 'Valheim world backup'
 ```
+
+The `world_name` setting selects a save; it does not set the generation seed. For a specific seed, create a world with that seed in the game client and transfer its save while the server is stopped. Keep the previous world under its original name to switch back. Valheim 1.0 stores migrated worlds in directories containing `.fwl2`, `.db2`, and chunk files; preserve the entire directory when backing up or transferring these worlds.
 
 Snapshots are billed separately; wait for completion before destructive maintenance. To restore a local archive, first `sudo systemctl stop valheim` on the running host, copy the current `.db` and `.fwl` files somewhere safe, inspect the ZIP paths, then restore the matching pair from the same backup to `config/worlds_local`. Preserve file ownership and use the matching `world_name`; restart with `sudo systemctl start valheim`. Do not extract over a live world. To recover a lost disk, create a volume from a snapshot **in the VM's Availability Zone**, reconcile/import it into Terraform's `aws_ebs_volume.world` resource, and update the attachment/bootstrap reference during a planned recovery. Do not initialize a blank disk over your only saved world.
 

@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "esbuild src/receiver.js src/worker.js --bundle --platform=node --target=node22 --format=cjs --outdir=dist --out-extension:.js=.cjs",
     "test": "node --test",
@@ -11,7 +13,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-ec2": "^3.0.0",
-    "@aws-sdk/client-lambda": "^3.0.0"
+    "@aws-sdk/client-lambda": "^3.0.0",
+    "@aws-sdk/client-ssm": "^3.1129.0"
   },
-  "devDependencies": { "esbuild": "^0.25.0" }
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
 }
