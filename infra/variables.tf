@@ -105,3 +105,9 @@ variable "allow_portal_items" {
   default     = false
   description = "Apply the casual portal modifier so ore and other restricted items can pass through portals."
 }
+
+variable "double_resources" {
+  type        = bool
+  default     = false
+  description = "Apply the muchmore resource modifier (2x drops) to the selected world."
+}

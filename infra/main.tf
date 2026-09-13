@@ -105,6 +105,7 @@ resource "aws_instance" "game" {
     server_name        = var.server_name, world_name = var.world_name
     crossplay          = var.crossplay, container_image = var.container_image
     allow_portal_items = var.allow_portal_items
+    double_resources   = var.double_resources
   })
   tags       = { Name = var.name }
   depends_on = [aws_route_table_association.game, aws_iam_role_policy.password, aws_iam_role_policy_attachment.ssm]
