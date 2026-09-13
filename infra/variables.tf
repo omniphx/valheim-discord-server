@@ -111,3 +111,15 @@ variable "double_resources" {
   default     = false
   description = "Apply the muchmore resource modifier (2x drops) to the selected world."
 }
+
+variable "casual_death_penalty" {
+  type        = bool
+  default     = false
+  description = "Keep equipped gear on death and greatly reduce skill loss."
+}
+
+variable "less_raids" {
+  type        = bool
+  default     = false
+  description = "Apply the less frequent raids modifier without changing raid progression rules."
+}

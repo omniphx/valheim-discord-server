@@ -100,12 +100,14 @@ resource "aws_instance" "game" {
     encrypted   = true
   }
   user_data = templatefile("${path.module}/cloud-init.sh.tftpl", {
-    volume_id          = replace(aws_ebs_volume.world.id, "-", "")
-    region             = var.region, password_parameter = var.password_parameter_name
-    server_name        = var.server_name, world_name = var.world_name
-    crossplay          = var.crossplay, container_image = var.container_image
-    allow_portal_items = var.allow_portal_items
-    double_resources   = var.double_resources
+    volume_id            = replace(aws_ebs_volume.world.id, "-", "")
+    region               = var.region, password_parameter = var.password_parameter_name
+    server_name          = var.server_name, world_name = var.world_name
+    crossplay            = var.crossplay, container_image = var.container_image
+    allow_portal_items   = var.allow_portal_items
+    double_resources     = var.double_resources
+    casual_death_penalty = var.casual_death_penalty
+    less_raids           = var.less_raids
   })
   tags       = { Name = var.name }
   depends_on = [aws_route_table_association.game, aws_iam_role_policy.password, aws_iam_role_policy_attachment.ssm]

@@ -21,3 +21,7 @@ allow_portal_items = false
 
 # Double resource drops without generating a new world.
 double_resources = false
+
+# Keep equipped gear on death, reduce skill loss, and reduce raid frequency.
+casual_death_penalty = false
+less_raids = false
